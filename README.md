@@ -1,14 +1,7 @@
-# Calculator
+# Pong
 
-A simple responsive calculator built with HTML, CSS, and JavaScript.
+A simple browser-based Pong game built with HTML, CSS, and JavaScript. Play against the computer by moving the left paddle with your mouse or the Up/Down arrow keys.
 
 ## Run
 
-Open `index.html` in a browser.
-
-## Features
-
-- Addition, subtraction, multiplication, and division
-- Decimal numbers
-- Clear and backspace controls
-- Mouse and keyboard support
+Open `index.html` in a modern web browser. No build tools or dependencies are required.

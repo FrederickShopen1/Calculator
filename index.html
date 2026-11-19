@@ -1,216 +1,249 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Calculator</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pong</title>
   <style>
     * { box-sizing: border-box; }
 
     body {
-      min-height: 100vh;
       margin: 0;
+      min-height: 100vh;
       display: grid;
       place-items: center;
-      background: #eef2f7;
-      font-family: Arial, sans-serif;
+      background: #10131c;
+      color: #f4f6ff;
+      font-family: system-ui, sans-serif;
     }
 
-    .calculator {
-      width: min(340px, 92vw);
-      padding: 18px;
-      border-radius: 18px;
-      background: #ffffff;
-      box-shadow: 0 12px 30px rgba(40, 50, 70, 0.16);
+    main {
+      width: min(92vw, 820px);
+      text-align: center;
     }
 
-    #display {
+    h1 {
+      margin: 0 0 12px;
+      letter-spacing: 0.12em;
+    }
+
+    .scoreboard {
+      display: flex;
+      justify-content: center;
+      gap: 48px;
+      margin-bottom: 12px;
+      font-size: 1.25rem;
+    }
+
+    canvas {
+      display: block;
       width: 100%;
-      height: 76px;
-      margin-bottom: 14px;
-      padding: 12px;
-      border: 0;
-      border-radius: 10px;
-      background: #f3f5f8;
-      color: #1f2937;
-      text-align: right;
-      font-size: 2.2rem;
+      height: auto;
+      border: 2px solid #596179;
+      border-radius: 8px;
+      background: #080a10;
+      cursor: none;
+      touch-action: none;
     }
 
-    .buttons {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
+    p {
+      color: #b7bfd3;
+      font-size: 0.95rem;
     }
-
-    button {
-      height: 58px;
-      border: 0;
-      border-radius: 10px;
-      background: #edf0f5;
-      color: #1f2937;
-      font-size: 1.15rem;
-      cursor: pointer;
-    }
-
-    button:hover { background: #dde3ec; }
-    button:active { transform: scale(0.97); }
-
-    .operator {
-      background: #dbeafe;
-      color: #1d4ed8;
-    }
-
-    .equals {
-      grid-row: span 2;
-      height: 126px;
-      background: #2563eb;
-      color: #ffffff;
-    }
-
-    .equals:hover { background: #1d4ed8; }
-    .zero { grid-column: span 2; }
   </style>
 </head>
 <body>
-  <main class="calculator">
-    <input id="display" type="text" value="0" readonly aria-label="Calculator display">
-
-    <div class="buttons">
-      <button class="operator" data-action="clear">C</button>
-      <button class="operator" data-action="backspace">⌫</button>
-      <button class="operator" data-action="operator">÷</button>
-      <button class="operator" data-action="operator">×</button>
-
-      <button data-number="7">7</button>
-      <button data-number="8">8</button>
-      <button data-number="9">9</button>
-      <button class="operator" data-action="operator">−</button>
-
-      <button data-number="4">4</button>
-      <button data-number="5">5</button>
-      <button data-number="6">6</button>
-      <button class="operator" data-action="operator">+</button>
-
-      <button data-number="1">1</button>
-      <button data-number="2">2</button>
-      <button data-number="3">3</button>
-      <button class="equals" data-action="equals">=</button>
-
-      <button class="zero" data-number="0">0</button>
-      <button data-action="decimal">.</button>
+  <main>
+    <h1>PONG</h1>
+    <div class="scoreboard" aria-live="polite">
+      <span>You: <strong id="player-score">0</strong></span>
+      <span>Computer: <strong id="computer-score">0</strong></span>
     </div>
+    <canvas id="game" width="800" height="500" aria-label="Pong game"></canvas>
+    <p>Move your mouse over the game or use the ↑ and ↓ arrow keys.</p>
   </main>
 
   <script>
-    const display = document.getElementById("display");
-    let firstNumber = null;
-    let operator = null;
-    let waitingForNumber = false;
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    const playerScoreDisplay = document.getElementById("player-score");
+    const computerScoreDisplay = document.getElementById("computer-score");
 
-    function updateDisplay(value) {
-      display.value = value;
+    const WIDTH = canvas.width;
+    const HEIGHT = canvas.height;
+    const PADDLE_WIDTH = 12;
+    const PADDLE_HEIGHT = 90;
+    const PADDLE_MARGIN = 24;
+    const PLAYER_SPEED = 420;
+    const COMPUTER_SPEED = 310;
+
+    const player = {
+      x: PADDLE_MARGIN,
+      y: (HEIGHT - PADDLE_HEIGHT) / 2,
+      score: 0
+    };
+
+    const computer = {
+      x: WIDTH - PADDLE_MARGIN - PADDLE_WIDTH,
+      y: (HEIGHT - PADDLE_HEIGHT) / 2,
+      score: 0
+    };
+
+    const ball = {
+      x: WIDTH / 2,
+      y: HEIGHT / 2,
+      radius: 9,
+      vx: 300,
+      vy: 150,
+      speed: 340
+    };
+
+    const keys = { up: false, down: false };
+    let lastTime = 0;
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
     }
 
-    function inputNumber(number) {
-      if (waitingForNumber) {
-        updateDisplay(number);
-        waitingForNumber = false;
-      } else {
-        updateDisplay(display.value === "0" ? number : display.value + number);
-      }
+    function resetBall(direction) {
+      ball.x = WIDTH / 2;
+      ball.y = HEIGHT / 2;
+      ball.speed = 340;
+      ball.vx = ball.speed * direction;
+      ball.vy = Math.random() * 180 - 90;
     }
 
-    function inputDecimal() {
-      if (waitingForNumber) {
-        updateDisplay("0.");
-        waitingForNumber = false;
-      } else if (!display.value.includes(".")) {
-        updateDisplay(display.value + ".");
-      }
+    function movePlayerTo(clientY) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleY = HEIGHT / rect.height;
+      player.y = clamp(
+        (clientY - rect.top) * scaleY - PADDLE_HEIGHT / 2,
+        0,
+        HEIGHT - PADDLE_HEIGHT
+      );
     }
 
-    function chooseOperator(nextOperator) {
-      const inputValue = Number(display.value);
-
-      if (operator && waitingForNumber) {
-        operator = nextOperator;
-        return;
-      }
-
-      if (firstNumber === null) {
-        firstNumber = inputValue;
-      } else if (operator) {
-        firstNumber = calculate(firstNumber, inputValue, operator);
-        updateDisplay(String(firstNumber));
-      }
-
-      operator = nextOperator;
-      waitingForNumber = true;
-    }
-
-    function calculate(first, second, selectedOperator) {
-      switch (selectedOperator) {
-        case "+": return first + second;
-        case "−": return first - second;
-        case "×": return first * second;
-        case "÷": return second === 0 ? "Error" : first / second;
-        default: return second;
-      }
-    }
-
-    function clearCalculator() {
-      firstNumber = null;
-      operator = null;
-      waitingForNumber = false;
-      updateDisplay("0");
-    }
-
-    function backspace() {
-      if (!waitingForNumber) {
-        const shortened = display.value.slice(0, -1);
-        updateDisplay(shortened || "0");
-      }
-    }
-
-    function calculateResult() {
-      if (operator === null || waitingForNumber) return;
-
-      const result = calculate(firstNumber, Number(display.value), operator);
-      updateDisplay(String(result));
-      firstNumber = null;
-      operator = null;
-      waitingForNumber = true;
-    }
-
-    document.querySelectorAll("button").forEach((button) => {
-      button.addEventListener("click", () => {
-        if (button.dataset.number) {
-          inputNumber(button.dataset.number);
-          return;
-        }
-
-        switch (button.dataset.action) {
-          case "decimal": inputDecimal(); break;
-          case "operator": chooseOperator(button.textContent); break;
-          case "equals": calculateResult(); break;
-          case "clear": clearCalculator(); break;
-          case "backspace": backspace(); break;
-        }
-      });
+    canvas.addEventListener("pointermove", (event) => {
+      movePlayerTo(event.clientY);
     });
 
-    document.addEventListener("keydown", (event) => {
-      if (/^[0-9]$/.test(event.key)) inputNumber(event.key);
-      if (event.key === ".") inputDecimal();
-      if (event.key === "+") chooseOperator("+");
-      if (event.key === "-") chooseOperator("−");
-      if (event.key === "*") chooseOperator("×");
-      if (event.key === "/") chooseOperator("÷");
-      if (event.key === "Enter" || event.key === "=") calculateResult();
-      if (event.key === "Escape") clearCalculator();
-      if (event.key === "Backspace") backspace();
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+        event.preventDefault();
+        if (event.key === "ArrowUp") keys.up = true;
+        if (event.key === "ArrowDown") keys.down = true;
+      }
     });
+
+    window.addEventListener("keyup", (event) => {
+      if (event.key === "ArrowUp") keys.up = false;
+      if (event.key === "ArrowDown") keys.down = false;
+    });
+
+    function update(delta) {
+      if (keys.up) player.y -= PLAYER_SPEED * delta;
+      if (keys.down) player.y += PLAYER_SPEED * delta;
+      player.y = clamp(player.y, 0, HEIGHT - PADDLE_HEIGHT);
+
+      // The computer tracks the ball, but has a speed limit.
+      const computerCenter = computer.y + PADDLE_HEIGHT / 2;
+      const difference = ball.y - computerCenter;
+      computer.y += clamp(difference, -COMPUTER_SPEED * delta, COMPUTER_SPEED * delta);
+      computer.y = clamp(computer.y, 0, HEIGHT - PADDLE_HEIGHT);
+
+      ball.x += ball.vx * delta;
+      ball.y += ball.vy * delta;
+
+      // Top and bottom wall collisions.
+      if (ball.y - ball.radius <= 0) {
+        ball.y = ball.radius;
+        ball.vy = Math.abs(ball.vy);
+      } else if (ball.y + ball.radius >= HEIGHT) {
+        ball.y = HEIGHT - ball.radius;
+        ball.vy = -Math.abs(ball.vy);
+      }
+
+      // Paddle collisions, only when the ball is moving toward that paddle.
+      if (
+        ball.vx < 0 &&
+        ball.x - ball.radius <= player.x + PADDLE_WIDTH &&
+        ball.x + ball.radius >= player.x &&
+        ball.y + ball.radius >= player.y &&
+        ball.y - ball.radius <= player.y + PADDLE_HEIGHT
+      ) {
+        bounceFromPaddle(player);
+      }
+
+      if (
+        ball.vx > 0 &&
+        ball.x + ball.radius >= computer.x &&
+        ball.x - ball.radius <= computer.x + PADDLE_WIDTH &&
+        ball.y + ball.radius >= computer.y &&
+        ball.y - ball.radius <= computer.y + PADDLE_HEIGHT
+      ) {
+        bounceFromPaddle(computer);
+      }
+
+      // A point is scored when the ball passes either paddle.
+      if (ball.x + ball.radius < 0) {
+        computer.score++;
+        computerScoreDisplay.textContent = computer.score;
+        resetBall(1);
+      } else if (ball.x - ball.radius > WIDTH) {
+        player.score++;
+        playerScoreDisplay.textContent = player.score;
+        resetBall(-1);
+      }
+    }
+
+    function bounceFromPaddle(paddle) {
+      const paddleCenter = paddle.y + PADDLE_HEIGHT / 2;
+      const hitPosition = (ball.y - paddleCenter) / (PADDLE_HEIGHT / 2);
+      const direction = ball.vx < 0 ? 1 : -1;
+
+      ball.speed = Math.min(ball.speed + 18, 620);
+      ball.vx = direction * ball.speed;
+      ball.vy = hitPosition * ball.speed * 0.75;
+
+      // Keep the ball just outside the paddle to prevent repeated collisions.
+      ball.x = direction > 0
+        ? paddle.x + PADDLE_WIDTH + ball.radius
+        : paddle.x - ball.radius;
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+      // Dashed center line.
+      ctx.strokeStyle = "#34394a";
+      ctx.lineWidth = 3;
+      ctx.setLineDash([10, 12]);
+      ctx.beginPath();
+      ctx.moveTo(WIDTH / 2, 0);
+      ctx.lineTo(WIDTH / 2, HEIGHT);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Paddles and ball.
+      ctx.fillStyle = "#f4f6ff";
+      ctx.fillRect(player.x, player.y, PADDLE_WIDTH, PADDLE_HEIGHT);
+      ctx.fillRect(computer.x, computer.y, PADDLE_WIDTH, PADDLE_HEIGHT);
+
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function frame(timestamp) {
+      const delta = lastTime ? Math.min((timestamp - lastTime) / 1000, 0.03) : 0;
+      lastTime = timestamp;
+      update(delta);
+      draw();
+      requestAnimationFrame(frame);
+    }
+
+    resetBall(Math.random() < 0.5 ? -1 : 1);
+    requestAnimationFrame(frame);
   </script>
 </body>
 </html>
